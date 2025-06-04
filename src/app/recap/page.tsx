@@ -11,21 +11,23 @@ import { Footer } from '@/components/layout/footer';
 import { MonthlyRecapView } from '@/components/recap/monthly-recap-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation'; // No longer used
 import { Button } from '@/components/ui/button';
-import { LogIn, Mountain } from 'lucide-react'; // Ensure Mountain is imported
+import { LogIn, Mountain } from 'lucide-react';
 
 export default function RecapPage() {
   const { user, login, isLoading: authIsLoading } = useAuth();
-  const router = useRouter();
+  // const router = useRouter(); // No longer used
 
-  // TODO: These will be replaced with data fetched for the logged-in user
+  const habitsKey = user ? `zenith_habits_${user.id}` : 'zenith_habits';
+  const completionStatusKey = user ? `zenith_habit_completion_status_${user.id}` : 'zenith_habit_completion_status';
+
   const [habits, setHabits] = useLocalStorage<Habit[]>(
-    user ? `zenith_habits_${user.id}` : 'zenith_habits', 
+    habitsKey, 
     DEFAULT_HABITS
   );
   const [habitCompletionStatus, setHabitCompletionStatus] = useLocalStorage<HabitCompletionStatus>(
-    user ? `zenith_habit_completion_status_${user.id}` : 'zenith_habit_completion_status',
+    completionStatusKey,
     {}
   );
   const [isClient, setIsClient] = useState(false);
@@ -34,33 +36,6 @@ export default function RecapPage() {
     setIsClient(true);
   }, []);
   
-  useEffect(() => {
-    if (!authIsLoading && !user && isClient) {
-      // Optional: redirect to home or show login prompt if preferred
-      // For now, it will show a login prompt on this page if not logged in.
-    }
-     // If user logs in/out, re-fetch or adjust localStorage keys
-    if (user) {
-      const userHabitsKey = `zenith_habits_${user.id}`;
-      const userCompletionStatusKey = `zenith_habit_completion_status_${user.id}`;
-      
-      const storedUserHabits = localStorage.getItem(userHabitsKey);
-      setHabits(storedUserHabits ? JSON.parse(storedUserHabits) : DEFAULT_HABITS);
-
-      const storedUserCompletion = localStorage.getItem(userCompletionStatusKey);
-      setHabitCompletionStatus(storedUserCompletion ? JSON.parse(storedUserCompletion) : {});
-    } else if (!authIsLoading) {
-       // Fallback to general keys if no user
-      const defaultHabits = localStorage.getItem('zenith_habits');
-      setHabits(defaultHabits ? JSON.parse(defaultHabits) : DEFAULT_HABITS);
-
-      const defaultCompletion = localStorage.getItem('zenith_habit_completion_status');
-      setHabitCompletionStatus(defaultCompletion ? JSON.parse(defaultCompletion) : {});
-    }
-
-  }, [user, authIsLoading, isClient, setHabits, setHabitCompletionStatus]);
-
-
   if (authIsLoading || !isClient) {
     return (
       <div className="flex flex-col min-h-screen bg-background text-foreground">
