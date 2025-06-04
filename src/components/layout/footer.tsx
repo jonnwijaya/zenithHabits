@@ -1,4 +1,3 @@
-import { ProgressShareDialog } from '@/components/general/progress-share-dialog';
 import type { Habit } from '@/types';
 
 interface FooterProps {
@@ -21,7 +20,7 @@ export function Footer({ habits }: FooterProps) {
             <span>Add some habits to start tracking your progress.</span>
           )}
         </div>
-        <ProgressShareDialog habits={habits} />
+        {/* ProgressShareDialog was here */}
       </div>
       <p className="text-center text-xs text-muted-foreground mt-4">
         Zenith Habits &copy; {new Date().getFullYear()}
