@@ -1,3 +1,4 @@
+
 import type { Habit, Affirmation } from '@/types';
 
 export const DEFAULT_HABITS: Habit[] = [
@@ -13,6 +14,39 @@ export const DEFAULT_AFFIRMATIONS: Affirmation[] = [
   { id: '3', text: 'I am resilient, strong, and full of positive energy.' },
   { id: '4', text: 'Every step I take brings me closer to my goals.' },
   { id: '5', text: 'I choose to be happy and grateful for this day.' },
+  { id: '6', text: 'I trust in my abilities and intuition.' },
+  { id: '7', text: 'I am worthy of love, success, and happiness.' },
+  { id: '8', text: 'I attract positive experiences and people into my life.' },
+  { id: '9', text: 'My potential is limitless, and I am constantly growing.' },
+  { id: '10', text: 'I am focused, persistent, and will not give up on my dreams.' },
+  { id: '11', text: 'I radiate confidence and self-assurance.' },
+  { id: '12', text: 'I am a magnet for abundance and prosperity.' },
+  { id: '13', text: 'I forgive myself and others, releasing all negativity.' },
+  { id: '14', text: 'My mind is clear, and my thoughts are powerful.' },
+  { id: '15', text: 'I am in control of my thoughts, feelings, and actions.' },
+  { id: '16', text: 'I find joy and inspiration in the small things.' },
+  { id: '17', text: 'I am creating the life of my dreams, one step at a time.' },
+  { id: '18', text: 'I am grateful for my health, my relationships, and my opportunities.' },
+  { id: '19', text: 'I am open to receiving all the good life has to offer.' },
+  { id: '20', text: 'I make a positive impact on the world around me.' },
+  { id: '21', text: 'I am becoming the best version of myself.' },
+  { id: '22', text: 'I believe in myself and my journey.' },
+  { id: '23', text: 'My creativity flows effortlessly.' },
+  { id: '24', text: 'I handle stress with grace and ease.' },
+  { id: '25', text: 'I am surrounded by love and support.' },
+  { id: '26', text: 'I am proud of all that I have accomplished.' },
+  { id: '27', text: 'I approach new challenges with excitement and courage.' },
+  { id: '28', text: 'My heart is open, and I give and receive love freely.' },
+  { id: '29', text: 'I am a source of inspiration to others.' },
+  { id: '30', text: 'Today, I will make a difference.' },
+  { id: '31', text: 'I am grounded, centered, and at peace.' },
+  { id: '32', text: 'I learn from my mistakes and grow stronger.' },
+  { id: '33', text: 'My body is healthy, and my mind is bright.' },
+  { id: '34', text: 'I am courageous and stand up for what I believe in.' },
+  { id: '35', text: 'I find solutions to every problem I encounter.' },
+  { id: '36', text: 'I am filled with vitality and enthusiasm.' },
+  { id: '37', text: 'My positive attitude opens doors to new opportunities.' },
+  { id: '38', text: 'I am at peace with my past, present, and future.' },
+  { id: '39', text: 'I value myself and my time.' },
+  { id: '40', text: 'I am constantly learning and evolving.' },
 ];
-
-// GOALS_FOR_AI_TIPS was removed as the feature is no longer present.
