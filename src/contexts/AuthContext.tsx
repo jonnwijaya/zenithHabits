@@ -21,6 +21,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // Initialize Netlify Identity
+    // This makes sure the widget is ready to handle login, signup, etc.
     netlifyIdentity.init({
       // APIUrl: process.env.NEXT_PUBLIC_NETLIFY_IDENTITY_API_URL, // Optional: if using a custom Identity instance
     });
@@ -31,36 +32,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(false);
 
-    netlifyIdentity.on('login', (loggedInUser) => {
+    const handleLogin = (loggedInUser: User) => {
       setUser(loggedInUser);
       netlifyIdentity.close(); // Close the modal on login
-      setIsLoading(false);
-    });
+      setIsLoading(false); // Ensure loading is false after login sequence
+    };
 
-    netlifyIdentity.on('logout', () => {
+    const handleLogout = () => {
       setUser(null);
-      setIsLoading(false);
-    });
+      setIsLoading(false); // Ensure loading is false after logout
+    };
     
-    netlifyIdentity.on('error', (err) => {
+    const handleError = (err: any) => {
       console.error('Netlify Identity Error:', err);
-      setIsLoading(false);
-    });
+      setIsLoading(false); // Ensure loading is false on error
+    };
 
+    // Set up event listeners for Identity events
+    netlifyIdentity.on('login', handleLogin);
+    netlifyIdentity.on('logout', handleLogout);
+    netlifyIdentity.on('error', handleError);
 
-    // Cleanup
+    // Cleanup function to remove event listeners when the AuthProvider unmounts
     return () => {
-      // Consider if off('event', callback) is needed, but usually init handles it.
-      // For this simple setup, direct cleanup might not be essential as widget handles its state.
+      netlifyIdentity.off('login', handleLogin);
+      netlifyIdentity.off('logout', handleLogout);
+      netlifyIdentity.off('error', handleError);
     };
   }, []);
 
   const login = () => {
-    netlifyIdentity.open('login');
+    netlifyIdentity.open('login'); // Opens the Netlify Identity widget for login
   };
 
   const logout = () => {
-    netlifyIdentity.logout();
+    netlifyIdentity.logout(); // Logs out the current user via Netlify Identity
   };
 
   return (
@@ -77,3 +83,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
