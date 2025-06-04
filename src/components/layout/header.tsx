@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { Mountain } from 'lucide-react';
+import { Mountain, CalendarDays } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { Button } from '@/components/ui/button';
 
 export function Header() {
   return (
@@ -11,6 +12,11 @@ export function Header() {
           <span className="font-headline text-lg font-semibold">Zenith Habits</span>
         </Link>
         <nav className="flex items-center gap-2">
+          <Link href="/recap" passHref>
+            <Button variant="ghost" size="icon" aria-label="Monthly Recap">
+              <CalendarDays className="h-[1.2rem] w-[1.2rem]" />
+            </Button>
+          </Link>
           <ThemeToggle />
         </nav>
       </div>
