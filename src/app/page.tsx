@@ -19,11 +19,11 @@ import { LogIn, Mountain } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function HomePage() {
-  const { user, login, logout, isLoading: authIsLoading } = useAuth();
+  const { user, loginWithGoogle, logout, isLoading: authIsLoading, idToken } = useAuth();
   const { toast } = useToast();
   
-  const habitsKey = user ? `zenith_habits_${user.id}` : 'zenith_habits_guest';
-  const completionStatusKey = user ? `zenith_habit_completion_status_${user.id}` : 'zenith_habit_completion_status_guest';
+  const habitsKey = user ? `zenith_habits_${user.uid}` : 'zenith_habits_guest';
+  const completionStatusKey = user ? `zenith_habit_completion_status_${user.uid}` : 'zenith_habit_completion_status_guest';
 
   const [habits, setHabits] = useLocalStorage<Habit[]>(habitsKey, DEFAULT_HABITS);
   const [habitCompletionStatus, setHabitCompletionStatus] = useLocalStorage<HabitCompletionStatus>(
@@ -38,12 +38,15 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (user && isClient) {
+    if (user && isClient && idToken) { // Ensure idToken is available
       const fetchData = async () => {
         setIsSyncing(true);
         try {
-          await user.jwt(true); // Force refresh token if needed
-          const response = await fetch('/.netlify/functions/get-user-data');
+          const response = await fetch('/.netlify/functions/get-user-data', {
+            headers: {
+              'Authorization': `Bearer ${idToken}`,
+            },
+          });
           if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || `Failed to fetch data: ${response.statusText}`);
@@ -51,15 +54,10 @@ export default function HomePage() {
           const data = await response.json();
           if (data.habits) setHabits(data.habits);
           if (data.completionStatus) setHabitCompletionStatus(data.completionStatus);
-          toast({ title: "Data Synced", description: "Your habits have been loaded from the cloud." });
+          // toast({ title: "Data Synced", description: "Your habits have been loaded from the cloud." });
         } catch (error: any) {
           console.error("Error fetching user data:", error);
-          if (error.message.includes("Failed to refresh token") || error.message.includes("session might have expired")) {
-             toast({ variant: "destructive", title: "Session Issue", description: "Could not load data: Session expired. Please log in again." });
-             // Optionally call logout() here if token refresh consistently fails
-          } else {
-            toast({ variant: "destructive", title: "Sync Error", description: `Could not load data: ${error.message}` });
-          }
+          toast({ variant: "destructive", title: "Sync Error", description: `Could not load data: ${error.message}` });
         } finally {
           setIsSyncing(false);
         }
@@ -68,17 +66,19 @@ export default function HomePage() {
     } else if (!user && isClient) {
       // Guest user or logged out, useLocalStorage handles loading data for guest keys
     }
-  }, [user, isClient, toast, setHabits, setHabitCompletionStatus, logout]);
+  }, [user, isClient, idToken, toast, setHabits, setHabitCompletionStatus, habitsKey, completionStatusKey]); // Added keys to dependencies
 
 
   const saveData = useCallback(async (currentHabits: Habit[], currentStatus: HabitCompletionStatus) => {
-    if (user && isClient) {
+    if (user && isClient && idToken) {
       setIsSyncing(true);
       try {
-        await user.jwt(true); // Force refresh token if needed
         const response = await fetch('/.netlify/functions/save-user-data', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+          },
           body: JSON.stringify({ habits: currentHabits, habitCompletionStatus: currentStatus }),
         });
         if (!response.ok) {
@@ -88,26 +88,22 @@ export default function HomePage() {
         // toast({ title: "Progress Saved", description: "Your changes are saved to the cloud." });
       } catch (error: any) {
         console.error("Error saving user data:", error);
-         if (error.message.includes("Failed to refresh token") || error.message.includes("session might have expired")) {
-             toast({ variant: "destructive", title: "Session Issue", description: "Could not save: Session expired. Please log in again." });
-             // Optionally call logout() here
-        } else {
-          toast({ variant: "destructive", title: "Save Error", description: `Could not save changes: ${error.message}. Your data is saved locally.` });
-        }
+        toast({ variant: "destructive", title: "Save Error", description: `Could not save changes: ${error.message}. Your data is saved locally.` });
       } finally {
         setIsSyncing(false);
       }
     }
-  }, [user, isClient, toast, logout]);
+  }, [user, isClient, idToken, toast]);
 
   useEffect(() => {
-    if (user && isClient) {
+    // Debounced save for logged-in users
+    if (user && isClient && idToken) {
       const handler = setTimeout(() => {
         saveData(habits, habitCompletionStatus);
       }, 1500); 
       return () => clearTimeout(handler);
     }
-  }, [habits, habitCompletionStatus, user, isClient, saveData]);
+  }, [habits, habitCompletionStatus, user, isClient, idToken, saveData]);
 
 
   useEffect(() => {
@@ -127,7 +123,7 @@ export default function HomePage() {
         return h;
       })
     );
-  }, [isClient, habitsKey, setHabits]);
+  }, [isClient, setHabits]); // Removed habitsKey as dependency, setHabits should be stable from useLocalStorage
 
   const handleSaveHabit = (habitData: { name: string; icon: string }, id?: string) => {
     if (id) {
@@ -238,9 +234,9 @@ export default function HomePage() {
           <p className="text-lg text-muted-foreground mb-8">
             Please log in to track your habits and sync your progress across devices.
           </p>
-          <Button size="lg" onClick={login} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            <LogIn className="mr-2 h-5 w-5" />
-            Login / Sign Up
+          <Button size="lg" onClick={loginWithGoogle} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+             <svg className="mr-2 h-5 w-5" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
+            Sign in with Google
           </Button>
         </main>
         <Footer habits={[]} />
@@ -272,5 +268,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    

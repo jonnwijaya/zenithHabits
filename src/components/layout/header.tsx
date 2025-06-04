@@ -18,15 +18,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 
 export function Header() {
-  const { user, login, logout, isLoading } = useAuth();
+  const { user, loginWithGoogle, logout, isLoading } = useAuth();
 
-  const getInitials = (email?: string) => {
-    if (!email) return 'U';
-    const parts = email.split('@')[0].split(/[._-]/);
-    if (parts.length > 1) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
+  const getInitials = (displayName?: string | null, email?: string | null) => {
+    if (displayName) {
+      const names = displayName.split(' ');
+      if (names.length > 1) {
+        return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+      }
+      return displayName.substring(0, 2).toUpperCase();
     }
-    return email.substring(0, 2).toUpperCase();
+    if (email) {
+      return email.substring(0, 2).toUpperCase();
+    }
+    return 'U';
   }
 
   return (
@@ -54,8 +59,8 @@ export function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.user_metadata?.avatar_url} alt={user.user_metadata?.full_name || user.email} />
-                    <AvatarFallback>{getInitials(user.email)}</AvatarFallback>
+                    {user.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || user.email || 'User'} />}
+                    <AvatarFallback>{getInitials(user.displayName, user.email)}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
@@ -63,16 +68,15 @@ export function Header() {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">
-                      {user.user_metadata?.full_name || 'User'}
+                      {user.displayName || 'User'}
                     </p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
-                    </p>
+                    {user.email && (
+                       <p className="text-xs leading-none text-muted-foreground">
+                        {user.email}
+                      </p>
+                    )}
                   </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {/* Add other items like "Profile", "Settings" if needed */}
-                {/* <DropdownMenuItem>Settings</DropdownMenuItem> */}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
@@ -81,9 +85,9 @@ export function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button variant="ghost" onClick={login}>
-              <LogIn className="mr-2 h-[1.2rem] w-[1.2rem]" />
-              Login
+            <Button variant="outline" onClick={loginWithGoogle}>
+              <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
+              Sign in with Google
             </Button>
           )}
         </nav>

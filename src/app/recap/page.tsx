@@ -16,11 +16,11 @@ import { LogIn, Mountain } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function RecapPage() {
-  const { user, login, logout, isLoading: authIsLoading } = useAuth();
+  const { user, loginWithGoogle, isLoading: authIsLoading, idToken } = useAuth();
   const { toast } = useToast();
 
-  const habitsKey = user ? `zenith_habits_${user.id}` : 'zenith_habits_guest';
-  const completionStatusKey = user ? `zenith_habit_completion_status_${user.id}` : 'zenith_habit_completion_status_guest';
+  const habitsKey = user ? `zenith_habits_${user.uid}` : 'zenith_habits_guest';
+  const completionStatusKey = user ? `zenith_habit_completion_status_${user.uid}` : 'zenith_habit_completion_status_guest';
 
   const [habits, setHabits] = useLocalStorage<Habit[]>(
     habitsKey, 
@@ -39,12 +39,15 @@ export default function RecapPage() {
   }, []);
 
   useEffect(() => {
-    if (user && isClient) {
+    if (user && isClient && idToken) {
       const fetchData = async () => {
         setIsSyncing(true);
         try {
-          await user.jwt(true); // Force refresh token if needed
-          const response = await fetch('/.netlify/functions/get-user-data');
+          const response = await fetch('/.netlify/functions/get-user-data', {
+             headers: {
+              'Authorization': `Bearer ${idToken}`,
+            },
+          });
           if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || `Failed to fetch data: ${response.statusText}`);
@@ -55,19 +58,14 @@ export default function RecapPage() {
           // toast({ title: "Recap Synced", description: "Your recap data has been loaded." });
         } catch (error: any) {
           console.error("Error fetching user data for recap:", error);
-           if (error.message.includes("Failed to refresh token") || error.message.includes("session might have expired")) {
-             toast({ variant: "destructive", title: "Session Issue", description: "Could not load recap: Session expired. Please log in again." });
-             // Optionally call logout() here
-          } else {
-            toast({ variant: "destructive", title: "Sync Error", description: `Could not load recap data: ${error.message}` });
-          }
+          toast({ variant: "destructive", title: "Sync Error", description: `Could not load recap data: ${error.message}` });
         } finally {
           setIsSyncing(false);
         }
       };
       fetchData();
     }
-  }, [user, isClient, toast, setHabits, setHabitCompletionStatus, logout]);
+  }, [user, isClient, idToken, toast, setHabits, setHabitCompletionStatus, habitsKey, completionStatusKey]);
   
   if (authIsLoading || !isClient || (user && isSyncing && habits.length === 0 && !DEFAULT_HABITS.length)) {
     return (
@@ -107,9 +105,9 @@ export default function RecapPage() {
           <p className="text-lg text-muted-foreground mb-8">
             Please log in to see your monthly habit recap.
           </p>
-          <Button size="lg" onClick={login} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            <LogIn className="mr-2 h-5 w-5" />
-            Login / Sign Up
+          <Button size="lg" onClick={loginWithGoogle} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <svg className="mr-2 h-5 w-5" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
+            Sign in with Google
           </Button>
         </main>
         <Footer habits={[]} />
@@ -135,5 +133,3 @@ export default function RecapPage() {
     </div>
   );
 }
-
-    
