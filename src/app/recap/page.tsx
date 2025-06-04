@@ -11,16 +11,16 @@ import { Footer } from '@/components/layout/footer';
 import { MonthlyRecapView } from '@/components/recap/monthly-recap-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
-// import { useRouter } from 'next/navigation'; // No longer used
 import { Button } from '@/components/ui/button';
 import { LogIn, Mountain } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function RecapPage() {
   const { user, login, isLoading: authIsLoading } = useAuth();
-  // const router = useRouter(); // No longer used
+  const { toast } = useToast();
 
-  const habitsKey = user ? `zenith_habits_${user.id}` : 'zenith_habits';
-  const completionStatusKey = user ? `zenith_habit_completion_status_${user.id}` : 'zenith_habit_completion_status';
+  const habitsKey = user ? `zenith_habits_${user.id}` : 'zenith_habits_guest';
+  const completionStatusKey = user ? `zenith_habit_completion_status_${user.id}` : 'zenith_habit_completion_status_guest';
 
   const [habits, setHabits] = useLocalStorage<Habit[]>(
     habitsKey, 
@@ -31,12 +31,43 @@ export default function RecapPage() {
     {}
   );
   const [isClient, setIsClient] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Fetch data from backend when user logs in for recap page
+  useEffect(() => {
+    if (user && isClient) {
+      const fetchData = async () => {
+        setIsSyncing(true);
+        try {
+          const response = await fetch('/.netlify/functions/get-user-data');
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Failed to fetch data: ${response.statusText}`);
+          }
+          const data = await response.json();
+          // Note: Recap page doesn't modify data, so it only needs to set it once on load.
+          // If it could modify, it would need a saveData mechanism like HomePage.
+          if (data.habits) setHabits(data.habits);
+          if (data.completionStatus) setHabitCompletionStatus(data.completionStatus);
+          // toast({ title: "Recap Synced", description: "Your recap data has been loaded." });
+        } catch (error) {
+          console.error("Error fetching user data for recap:", error);
+          toast({ variant: "destructive", title: "Sync Error", description: `Could not load recap data: ${error.message}` });
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+      fetchData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isClient, toast]); // setHabits and setHabitCompletionStatus are stable from useLocalStorage
   
-  if (authIsLoading || !isClient) {
+  if (authIsLoading || !isClient || (user && isSyncing && habits.length === 0)) {
     return (
       <div className="flex flex-col min-h-screen bg-background text-foreground">
         <Header />
@@ -52,6 +83,12 @@ export default function RecapPage() {
             </div>
             <Skeleton className="h-64 w-full" />
           </div>
+           <div className="text-center mt-4">
+             <Mountain className="h-8 w-8 text-primary mb-2 animate-pulse mx-auto" />
+             <p className="text-md text-muted-foreground">
+                { authIsLoading ? "Authenticating..." : isSyncing ? "Loading your recap..." : "Preparing recap..."}
+             </p>
+           </div>
         </main>
         <Footer habits={[]} />
       </div>
@@ -82,7 +119,15 @@ export default function RecapPage() {
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
-        <MonthlyRecapView habits={habits} completionStatus={habitCompletionStatus} />
+        { habits.length === 0 && !isSyncing ? (
+            <div className="text-center py-10">
+                 <Mountain className="h-12 w-12 text-primary mb-4 mx-auto" />
+                <p className="text-xl text-muted-foreground">No habit data to display for your recap yet.</p>
+                <p className="text-sm text-muted-foreground mt-2">Start tracking some habits on the main page!</p>
+            </div>
+        ) : (
+           <MonthlyRecapView habits={habits} completionStatus={habitCompletionStatus} />
+        )}
       </main>
       <Footer habits={habits} />
     </div>
