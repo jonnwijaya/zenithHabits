@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,7 +13,7 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
-import { BarChart, Share2, Download } from "lucide-react";
+import { BarChart, Share2, Download, Loader2 } from "lucide-react";
 import {
   ChartContainer,
   ChartTooltip,
@@ -23,12 +24,13 @@ import {
 import { Bar, XAxis, YAxis, CartesianGrid, BarChart as RechartsBarChart } from "recharts"
 import type { Habit } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { toPng } from 'html-to-image';
 
 interface ProgressShareDialogProps {
   habits: Habit[];
-  // In a real app, you'd pass more structured progress data
 }
 
+// Example data - in a real app, this should be dynamic based on actual completion history
 const chartDataExample = [
   { date: "Mon", completed: 3, total: 5 },
   { date: "Tue", completed: 4, total: 5 },
@@ -54,27 +56,86 @@ const chartConfig = {
 export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
   const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-
-  const handleShare = () => {
-    // Placeholder for actual share functionality
-    toast({
-      title: "Sharing not implemented",
-      description: "This is a placeholder for sharing functionality.",
-    });
+  const getChartBackgroundColor = () => {
+    if (typeof window !== 'undefined') {
+      const style = window.getComputedStyle(document.documentElement);
+      const backgroundVar = style.getPropertyValue('--background').trim();
+      if (backgroundVar) {
+        return `hsl(${backgroundVar})`;
+      }
+    }
+    const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
+    return isDarkMode ? 'hsl(280, 8%, 17%)' : 'hsl(280, 25%, 97%)';
   };
 
-  const handleDownload = () => {
-     // Placeholder for actual download functionality
-     toast({
-      title: "Download not implemented",
-      description: "This is a placeholder for chart download functionality.",
-    });
-  }
+  const handleDownload = async () => {
+    if (!chartRef.current) {
+      toast({ title: "Error", description: "Chart element not found.", variant: "destructive" });
+      return;
+    }
+    setIsDownloading(true);
+    try {
+      const dataUrl = await toPng(chartRef.current, { 
+        pixelRatio: 2,
+        backgroundColor: getChartBackgroundColor(),
+      });
+      const link = document.createElement('a');
+      link.download = 'zenith-habits-progress.png';
+      link.href = dataUrl;
+      link.click();
+      link.remove();
+      toast({ title: "Success!", description: "Chart downloaded successfully." });
+    } catch (error) {
+      console.error('Failed to download chart:', error);
+      toast({ title: "Download Failed", description: "Could not download the chart.", variant: "destructive" });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+  
+  const totalHabits = habits.length;
+  const completedToday = habits.filter(h => h.completed).length;
+
+  const handleShare = async () => {
+    setIsSharing(true);
+    const shareText = `I've completed ${completedToday} out of ${totalHabits} habits today on Zenith Habits!`;
+    const shareUrl = typeof window !== "undefined" ? window.location.href : "https://your-app-url.com"; // Replace with actual app URL
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'My Zenith Habits Progress',
+          text: shareText,
+          url: shareUrl,
+        });
+        toast({ title: 'Shared!', description: 'Progress shared successfully.' });
+      } catch (error) {
+        // Don't show an error if user cancels share dialog (AbortError)
+        if ((error as DOMException).name !== 'AbortError') {
+          console.error('Error sharing:', error);
+          toast({ title: 'Share Failed', description: 'Could not share progress.', variant: 'destructive' });
+        }
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(`${shareText} Check it out: ${shareUrl}`);
+        toast({ title: 'Copied!', description: 'Progress details copied to clipboard.' });
+      } catch (error) {
+        console.error('Error copying to clipboard:', error);
+        toast({ title: 'Copy Failed', description: 'Could not copy to clipboard.', variant: 'destructive' });
+      }
+    }
+    setIsSharing(false);
+  };
+
 
   if (!isClient) {
     return (
@@ -85,14 +146,12 @@ export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
     );
   }
 
-  const totalHabits = habits.length;
-  const completedToday = habits.filter(h => h.completed).length;
-
+  // Update example data to use current habits length for "total"
   const weeklyProgress = chartDataExample.map(d => ({
     ...d,
-    completed: Math.floor(Math.random() * (totalHabits + 1)), // Random data for demo
-    total: totalHabits,
-    remaining: totalHabits - Math.floor(Math.random() * (totalHabits + 1))
+    completed: Math.min(d.completed, totalHabits > 0 ? totalHabits : 5), // Ensure completed isn't > total
+    total: totalHabits > 0 ? totalHabits : 5, // Use actual total habits or a default if none
+    remaining: Math.max(0, (totalHabits > 0 ? totalHabits : 5) - Math.min(d.completed, totalHabits > 0 ? totalHabits : 5))
   }));
 
 
@@ -117,31 +176,49 @@ export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
         
         <div className="my-4">
           <p className="text-center mb-2">Today: You've completed <strong>{completedToday}</strong> out of <strong>{totalHabits}</strong> habits!</p>
-          <ChartContainer config={chartConfig} className="w-full h-[250px]">
-            <RechartsBarChart accessibilityLayer data={weeklyProgress} margin={{left: -20}}>
-              <CartesianGrid vertical={false} />
+          <ChartContainer ref={chartRef} config={chartConfig} className="w-full h-[250px] bg-background p-4 rounded-md">
+            <RechartsBarChart accessibilityLayer data={weeklyProgress} margin={{left: -20, top: 5, right: 5, bottom: 5}}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis
                 dataKey="date"
                 tickLine={false}
                 tickMargin={10}
                 axisLine={false}
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={12}
               />
-              <YAxis domain={[0, totalHabits > 0 ? totalHabits : 5]} tickLine={false} axisLine={false} tickMargin={10} />
-              <ChartTooltip content={<ChartTooltipContent />} />
+              <YAxis 
+                domain={[0, totalHabits > 0 ? totalHabits : 5]} 
+                tickLine={false} 
+                axisLine={false} 
+                tickMargin={10} 
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={12}
+                allowDecimals={false}
+              />
+              <ChartTooltip 
+                cursor={{fill: 'hsl(var(--accent)/0.5)'}}
+                content={<ChartTooltipContent />} 
+              />
               <ChartLegend content={<ChartLegendContent />} />
-              <Bar dataKey="completed" fill="var(--color-completed)" radius={4} stackId="a" />
-              <Bar dataKey="remaining" fill="var(--color-remaining)" radius={4} stackId="a" />
+              <Bar dataKey="completed" fill="var(--color-completed)" radius={[4, 4, 0, 0]} stackId="a" />
+              <Bar dataKey="remaining" fill="var(--color-remaining)" radius={[4, 4, 0, 0]} stackId="a" />
             </RechartsBarChart>
           </ChartContainer>
         </div>
 
-        <DialogFooter className="sm:justify-between">
-          <Button type="button" variant="outline" onClick={handleDownload}>
-            <Download className="mr-2 h-4 w-4" />
+        <DialogFooter className="sm:justify-between gap-2 sm:gap-0">
+          <Button type="button" variant="outline" onClick={handleDownload} disabled={isDownloading}>
+            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
             Download Chart
           </Button>
-          <Button type="button" onClick={handleShare} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            <Share2 className="mr-2 h-4 w-4" />
+          <Button 
+            type="button" 
+            onClick={handleShare} 
+            disabled={isSharing}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            {isSharing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
             Share Now
           </Button>
         </DialogFooter>
@@ -149,3 +226,4 @@ export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
     </Dialog>
   );
 }
+

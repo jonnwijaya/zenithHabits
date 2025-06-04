@@ -12,7 +12,6 @@ import { Footer } from '@/components/layout/footer';
 import { HabitList } from '@/components/habit/habit-list';
 import { AffirmationDisplay } from '@/components/affirmations/affirmation-display';
 import { CalendarView } from '@/components/habit/calendar-view';
-import { GoalTipsDisplay } from '@/components/ai/goal-tips-display';
 import { MotivationalNudge } from '@/components/general/motivational-nudge';
 
 export default function HomePage() {
@@ -168,7 +167,7 @@ export default function HomePage() {
           <aside className="lg:col-span-1 space-y-6 sticky top-20">
             <AffirmationDisplay />
             <CalendarView habits={habits} completionStatus={habitCompletionStatus} />
-            <GoalTipsDisplay habits={habits} />
+            {/* GoalTipsDisplay was here */}
           </aside>
         </div>
       </main>

@@ -15,9 +15,4 @@ export const DEFAULT_AFFIRMATIONS: Affirmation[] = [
   { id: '5', text: 'I choose to be happy and grateful for this day.' },
 ];
 
-export const GOALS_FOR_AI_TIPS: string[] = [
-  "Maintain a healthy lifestyle",
-  "Improve focus and productivity",
-  "Cultivate mindfulness and inner peace",
-  "Achieve personal growth"
-];
+// GOALS_FOR_AI_TIPS was removed as the feature is no longer present.
