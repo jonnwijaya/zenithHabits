@@ -164,10 +164,9 @@ export default function HomePage() {
               onDeleteHabit={handleDeleteHabit}
             />
           </section>
-          <aside className="lg:col-span-1 space-y-6 sticky top-20">
+          <aside className="lg:col-span-1 space-y-6"> {/* Removed sticky top-20 */}
             <AffirmationDisplay />
             <CalendarView habits={habits} completionStatus={habitCompletionStatus} />
-            {/* GoalTipsDisplay was here */}
           </aside>
         </div>
       </main>
