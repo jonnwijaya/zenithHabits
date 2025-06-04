@@ -13,8 +13,12 @@ import { HabitList } from '@/components/habit/habit-list';
 import { AffirmationDisplay } from '@/components/affirmations/affirmation-display';
 import { CalendarView } from '@/components/habit/calendar-view';
 import { MotivationalNudge } from '@/components/general/motivational-nudge';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { LogIn, Mountain } from 'lucide-react'; // Ensure Mountain is imported
 
 export default function HomePage() {
+  const { user, login, isLoading: authIsLoading } = useAuth();
   const [habits, setHabits] = useLocalStorage<Habit[]>('zenith_habits', DEFAULT_HABITS);
   const [habitCompletionStatus, setHabitCompletionStatus] = useLocalStorage<HabitCompletionStatus>(
     'zenith_habit_completion_status',
@@ -24,17 +28,49 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsClient(true);
+    if (user) {
+      // TODO: Here we will fetch data from backend for the logged-in user
+      // For now, it continues to use localStorage or initializes if empty
+      // This logic will be replaced in the next step.
+      const userHabitsKey = `zenith_habits_${user.id}`;
+      const userCompletionStatusKey = `zenith_habit_completion_status_${user.id}`;
+      
+      const storedUserHabits = localStorage.getItem(userHabitsKey);
+      if (storedUserHabits) {
+        setHabits(JSON.parse(storedUserHabits));
+      } else {
+        // Potentially initialize with default or clear if starting fresh for this user
+        setHabits(DEFAULT_HABITS); 
+      }
+
+      const storedUserCompletion = localStorage.getItem(userCompletionStatusKey);
+      if (storedUserCompletion) {
+        setHabitCompletionStatus(JSON.parse(storedUserCompletion));
+      } else {
+        setHabitCompletionStatus({});
+      }
+    } else if (!authIsLoading) {
+      // If no user and not loading auth, reset to default non-user local storage
+      // or clear them if you prefer users to always log in for data.
+      // For this example, we'll keep using the general localStorage if not logged in.
+      const defaultHabits = localStorage.getItem('zenith_habits');
+      if (defaultHabits) setHabits(JSON.parse(defaultHabits)); else setHabits(DEFAULT_HABITS);
+
+      const defaultCompletion = localStorage.getItem('zenith_habit_completion_status');
+      if (defaultCompletion) setHabitCompletionStatus(JSON.parse(defaultCompletion)); else setHabitCompletionStatus({});
+    }
+  }, [user, authIsLoading, setHabits, setHabitCompletionStatus]);
+
+
+  useEffect(() => {
+    if (!isClient) return;
     // One-time check to update streaks for habits if app hasn't been opened for a while
-    // This prevents streaks from inaccurately persisting if days are missed without app interaction.
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     setHabits(prevHabits => 
       prevHabits.map(h => {
         if (h.completed && h.lastCompletedDate && h.lastCompletedDate !== todayStr) {
-          // If it was marked completed, but not today, mark it as not completed for today.
-          // Streak logic will handle reset on next actual completion.
           return { ...h, completed: false };
         }
-        // If a habit's lastCompletedDate is not today or yesterday, reset streak.
         if (h.streak > 0 && h.lastCompletedDate) {
           const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
           if (h.lastCompletedDate !== todayStr && h.lastCompletedDate !== yesterdayStr) {
@@ -44,10 +80,10 @@ export default function HomePage() {
         return h;
       })
     );
-  }, []);
-
+  }, [isClient, setHabits]); 
 
   const handleSaveHabit = (habitData: { name: string; icon: string }, id?: string) => {
+    // TODO: Save to backend if user is logged in
     if (id) {
       setHabits(prevHabits =>
         prevHabits.map(h => (h.id === id ? { ...h, ...habitData } : h))
@@ -65,6 +101,7 @@ export default function HomePage() {
   };
 
   const handleToggleComplete = (habitId: string) => {
+    // TODO: Save to backend if user is logged in
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
     let newCompletedValue: boolean | undefined;
@@ -73,33 +110,31 @@ export default function HomePage() {
       prevHabits.map(h => {
         if (h.id === habitId) {
           newCompletedValue = !h.completed;
-          if (newCompletedValue) { // Marking as complete
+          if (newCompletedValue) { 
             let newStreak = h.streak;
             let newLastCompletedDate = h.lastCompletedDate;
 
             if (h.lastCompletedDate) {
               const yesterday = subDays(today, 1);
               const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
-              if (h.lastCompletedDate === yesterdayStr) { // Continued from yesterday
+              if (h.lastCompletedDate === yesterdayStr) { 
                 newStreak = h.streak + 1;
-              } else if (h.lastCompletedDate !== todayStr) { // New streak (not today, not yesterday)
+              } else if (h.lastCompletedDate !== todayStr) { 
                 newStreak = 1;
               }
-              // If lastCompletedDate is todayStr, streak doesn't change by re-checking.
-            } else { // First completion ever
+            } else { 
               newStreak = 1;
             }
             newLastCompletedDate = todayStr;
             return { ...h, completed: true, streak: newStreak, lastCompletedDate: newLastCompletedDate };
-          } else { // Marking as incomplete
-            // If unchecking a habit completed today, reset streak that might have been updated today.
+          } else { 
             let revertedStreak = h.streak;
             let revertedLastCompletedDate = h.lastCompletedDate;
-            if (h.lastCompletedDate === todayStr) { // Was completed today
-              if (h.streak === 1) { // Streak started today
+            if (h.lastCompletedDate === todayStr) { 
+              if (h.streak === 1) { 
                 revertedStreak = 0;
                 revertedLastCompletedDate = undefined; 
-              } else if (h.streak > 1) { // Streak incremented today
+              } else if (h.streak > 1) { 
                 revertedStreak = h.streak - 1;
                 revertedLastCompletedDate = format(subDays(today, 1), 'yyyy-MM-dd');
               }
@@ -124,6 +159,7 @@ export default function HomePage() {
   };
 
   const handleDeleteHabit = (id: string) => {
+    // TODO: Delete from backend if user is logged in
     setHabits(prevHabits => prevHabits.filter(h => h.id !== id));
     setHabitCompletionStatus(prevStatus => {
       const newStatus = { ...prevStatus };
@@ -136,14 +172,33 @@ export default function HomePage() {
     });
   };
 
-  if (!isClient) {
-    // Render a basic loading state or null until client is mounted
-    // to prevent hydration mismatches with useLocalStorage
+  if (authIsLoading || !isClient) {
     return (
       <div className="flex flex-col min-h-screen">
         <Header />
-        <main className="flex-1 container mx-auto px-4 py-8 text-center">
-          <p>Loading habits...</p>
+        <main className="flex-1 container mx-auto px-4 py-8 text-center flex flex-col justify-center items-center">
+          <Mountain className="h-12 w-12 text-primary mb-4 animate-pulse" />
+          <p className="text-lg text-muted-foreground">Loading Zenith Habits...</p>
+        </main>
+        <Footer habits={[]} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Header />
+        <main className="flex-1 container mx-auto px-4 py-8 flex flex-col justify-center items-center text-center">
+          <Mountain className="h-16 w-16 text-primary mb-6" />
+          <h1 className="text-3xl font-bold mb-4">Welcome to Zenith Habits</h1>
+          <p className="text-lg text-muted-foreground mb-8">
+            Please log in to track your habits and sync your progress across devices.
+          </p>
+          <Button size="lg" onClick={login} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <LogIn className="mr-2 h-5 w-5" />
+            Login / Sign Up
+          </Button>
         </main>
         <Footer habits={[]} />
       </div>
@@ -164,7 +219,7 @@ export default function HomePage() {
               onDeleteHabit={handleDeleteHabit}
             />
           </section>
-          <aside className="lg:col-span-1 space-y-6"> {/* Removed sticky top-20 */}
+          <aside className="lg:col-span-1 space-y-6">
             <AffirmationDisplay />
             <CalendarView habits={habits} completionStatus={habitCompletionStatus} />
           </aside>
@@ -174,4 +229,3 @@ export default function HomePage() {
     </div>
   );
 }
-
