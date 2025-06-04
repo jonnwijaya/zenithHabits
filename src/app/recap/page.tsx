@@ -16,7 +16,7 @@ import { LogIn, Mountain } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function RecapPage() {
-  const { user, login, isLoading: authIsLoading } = useAuth();
+  const { user, login, logout, isLoading: authIsLoading } = useAuth();
   const { toast } = useToast();
 
   const habitsKey = user ? `zenith_habits_${user.id}` : 'zenith_habits_guest';
@@ -38,36 +38,38 @@ export default function RecapPage() {
     setIsClient(true);
   }, []);
 
-  // Fetch data from backend when user logs in for recap page
   useEffect(() => {
     if (user && isClient) {
       const fetchData = async () => {
         setIsSyncing(true);
         try {
+          await user.jwt(true); // Force refresh token if needed
           const response = await fetch('/.netlify/functions/get-user-data');
           if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || `Failed to fetch data: ${response.statusText}`);
           }
           const data = await response.json();
-          // Note: Recap page doesn't modify data, so it only needs to set it once on load.
-          // If it could modify, it would need a saveData mechanism like HomePage.
           if (data.habits) setHabits(data.habits);
           if (data.completionStatus) setHabitCompletionStatus(data.completionStatus);
           // toast({ title: "Recap Synced", description: "Your recap data has been loaded." });
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error fetching user data for recap:", error);
-          toast({ variant: "destructive", title: "Sync Error", description: `Could not load recap data: ${error.message}` });
+           if (error.message.includes("Failed to refresh token") || error.message.includes("session might have expired")) {
+             toast({ variant: "destructive", title: "Session Issue", description: "Could not load recap: Session expired. Please log in again." });
+             // Optionally call logout() here
+          } else {
+            toast({ variant: "destructive", title: "Sync Error", description: `Could not load recap data: ${error.message}` });
+          }
         } finally {
           setIsSyncing(false);
         }
       };
       fetchData();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isClient, toast]); // setHabits and setHabitCompletionStatus are stable from useLocalStorage
+  }, [user, isClient, toast, setHabits, setHabitCompletionStatus, logout]);
   
-  if (authIsLoading || !isClient || (user && isSyncing && habits.length === 0)) {
+  if (authIsLoading || !isClient || (user && isSyncing && habits.length === 0 && !DEFAULT_HABITS.length)) {
     return (
       <div className="flex flex-col min-h-screen bg-background text-foreground">
         <Header />
@@ -133,3 +135,5 @@ export default function RecapPage() {
     </div>
   );
 }
+
+    

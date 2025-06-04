@@ -19,10 +19,9 @@ import { LogIn, Mountain } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function HomePage() {
-  const { user, login, isLoading: authIsLoading } = useAuth();
+  const { user, login, logout, isLoading: authIsLoading } = useAuth();
   const { toast } = useToast();
   
-  // localStorage keys are now dynamic based on user ID or a generic key for logged-out users
   const habitsKey = user ? `zenith_habits_${user.id}` : 'zenith_habits_guest';
   const completionStatusKey = user ? `zenith_habit_completion_status_${user.id}` : 'zenith_habit_completion_status_guest';
 
@@ -32,18 +31,18 @@ export default function HomePage() {
     {}
   );
   const [isClient, setIsClient] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false); // For backend data sync
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Fetch data from backend when user logs in
   useEffect(() => {
     if (user && isClient) {
       const fetchData = async () => {
         setIsSyncing(true);
         try {
+          await user.jwt(true); // Force refresh token if needed
           const response = await fetch('/.netlify/functions/get-user-data');
           if (!response.ok) {
             const errorData = await response.json();
@@ -53,29 +52,30 @@ export default function HomePage() {
           if (data.habits) setHabits(data.habits);
           if (data.completionStatus) setHabitCompletionStatus(data.completionStatus);
           toast({ title: "Data Synced", description: "Your habits have been loaded from the cloud." });
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error fetching user data:", error);
-          toast({ variant: "destructive", title: "Sync Error", description: `Could not load data: ${error.message}` });
-          // If fetching fails, local storage (or defaults) will be used.
+          if (error.message.includes("Failed to refresh token") || error.message.includes("session might have expired")) {
+             toast({ variant: "destructive", title: "Session Issue", description: "Could not load data: Session expired. Please log in again." });
+             // Optionally call logout() here if token refresh consistently fails
+          } else {
+            toast({ variant: "destructive", title: "Sync Error", description: `Could not load data: ${error.message}` });
+          }
         } finally {
           setIsSyncing(false);
         }
       };
       fetchData();
     } else if (!user && isClient) {
-      // When user logs out, useLocalStorage hook re-initializes with guest keys.
-      // No explicit fetch needed here as useLocalStorage handles guest data.
-      // We might want to clear habits or explicitly load guest defaults if that's desired.
-      // For now, useLocalStorage handles this by switching keys.
+      // Guest user or logged out, useLocalStorage handles loading data for guest keys
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isClient, toast]); // setHabits & setHabitCompletionStatus are from useLocalStorage, their refs should be stable.
+  }, [user, isClient, toast, setHabits, setHabitCompletionStatus, logout]);
 
-  // Save data to backend when habits or completion status change for a logged-in user
+
   const saveData = useCallback(async (currentHabits: Habit[], currentStatus: HabitCompletionStatus) => {
     if (user && isClient) {
       setIsSyncing(true);
       try {
+        await user.jwt(true); // Force refresh token if needed
         const response = await fetch('/.netlify/functions/save-user-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -85,24 +85,26 @@ export default function HomePage() {
           const errorData = await response.json();
           throw new Error(errorData.message || `Failed to save data: ${response.statusText}`);
         }
-        // Optionally, provide a subtle success toast, or none if saving frequently.
         // toast({ title: "Progress Saved", description: "Your changes are saved to the cloud." });
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error saving user data:", error);
-        toast({ variant: "destructive", title: "Save Error", description: `Could not save changes: ${error.message}. Your data is saved locally.` });
+         if (error.message.includes("Failed to refresh token") || error.message.includes("session might have expired")) {
+             toast({ variant: "destructive", title: "Session Issue", description: "Could not save: Session expired. Please log in again." });
+             // Optionally call logout() here
+        } else {
+          toast({ variant: "destructive", title: "Save Error", description: `Could not save changes: ${error.message}. Your data is saved locally.` });
+        }
       } finally {
         setIsSyncing(false);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isClient, toast]); // Dependencies for useCallback
+  }, [user, isClient, toast, logout]);
 
-  // Debounced save effect
   useEffect(() => {
     if (user && isClient) {
       const handler = setTimeout(() => {
         saveData(habits, habitCompletionStatus);
-      }, 1500); // Debounce: save 1.5 seconds after the last change
+      }, 1500); 
       return () => clearTimeout(handler);
     }
   }, [habits, habitCompletionStatus, user, isClient, saveData]);
@@ -125,8 +127,7 @@ export default function HomePage() {
         return h;
       })
     );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClient, habitsKey]);
+  }, [isClient, habitsKey, setHabits]);
 
   const handleSaveHabit = (habitData: { name: string; icon: string }, id?: string) => {
     if (id) {
@@ -212,7 +213,7 @@ export default function HomePage() {
     });
   };
 
-  if (authIsLoading || !isClient || (user && isSyncing && habits.length === 0)) { // Show loading if auth is loading, or not client yet, or syncing initial data for a user
+  if (authIsLoading || !isClient || (user && isSyncing && habits.length === 0 && !DEFAULT_HABITS.length)) { 
     return (
       <div className="flex flex-col min-h-screen">
         <Header />
@@ -247,7 +248,6 @@ export default function HomePage() {
     );
   }
   
-  // User is logged in and data is available (either synced or from local storage)
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <Header />
@@ -272,3 +272,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
