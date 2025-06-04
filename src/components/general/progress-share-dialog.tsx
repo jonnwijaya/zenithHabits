@@ -68,8 +68,6 @@ export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
     if (typeof window !== 'undefined') {
       const style = window.getComputedStyle(document.documentElement);
       const backgroundVar = style.getPropertyValue('--background').trim();
-      // HSL variables are in the format "H S% L%" or "H S L"
-      // We need to convert this to hsl(H, S%, L%)
       if (backgroundVar) {
         const parts = backgroundVar.split(" ");
         if (parts.length === 3) {
@@ -77,7 +75,6 @@ export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
         }
       }
     }
-    // Fallback if CSS variable parsing fails
     const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
     return isDarkMode ? 'hsl(280, 8%, 17%)' : 'hsl(280, 25%, 97%)';
   };
@@ -92,7 +89,7 @@ export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
       const dataUrl = await toPng(chartRef.current, { 
         pixelRatio: 2,
         backgroundColor: getChartBackgroundColor(),
-        skipFonts: true, // Add this option to prevent font fetching issues
+        skipFonts: true, 
       });
       const link = document.createElement('a');
       link.download = 'zenith-habits-progress.png';
@@ -116,7 +113,12 @@ export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
     const shareText = `I've completed ${completedToday} out of ${totalHabits} habits today on Zenith Habits!`;
     const shareUrl = typeof window !== "undefined" ? window.location.href : "https://your-app-url.com"; // Replace with actual app URL
 
+    let shareAttempted = false;
+    let shareSucceeded = false;
+    let shareError: DOMException | null = null;
+
     if (navigator.share) {
+      shareAttempted = true;
       try {
         await navigator.share({
           title: 'My Zenith Habits Progress',
@@ -124,20 +126,40 @@ export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
           url: shareUrl,
         });
         toast({ title: 'Shared!', description: 'Progress shared successfully.' });
+        shareSucceeded = true;
       } catch (error) {
-        // Don't show an error if user cancels share dialog (AbortError)
-        if ((error as DOMException).name !== 'AbortError') {
-          console.error('Error sharing:', error);
-          toast({ title: 'Share Failed', description: 'Could not share progress.', variant: 'destructive' });
+        shareError = error as DOMException;
+        if (shareError.name === 'AbortError') {
+          console.log('Share cancelled by user.');
+        } else {
+          console.error('Error using Web Share API:', shareError);
+          // Error will be handled by fallback messaging
         }
       }
-    } else {
+    }
+
+    // Fallback to clipboard if Web Share API is not available, 
+    // or if it was attempted and failed (for a reason other than user cancellation)
+    if (!shareSucceeded && (!shareAttempted || (shareError && shareError.name !== 'AbortError'))) {
       try {
         await navigator.clipboard.writeText(`${shareText} Check it out: ${shareUrl}`);
-        toast({ title: 'Copied!', description: 'Progress details copied to clipboard.' });
-      } catch (error) {
-        console.error('Error copying to clipboard:', error);
-        toast({ title: 'Copy Failed', description: 'Could not copy to clipboard.', variant: 'destructive' });
+        if (shareAttempted && shareError) { // Share API was tried and failed
+          toast({ 
+            title: 'Sharing Failed, Copied Instead', 
+            description: `Could not share using the native interface (${shareError.message}). Progress copied to clipboard.`,
+            duration: 7000, // Longer duration for more info
+            variant: "default" // Not destructive, as copy succeeded
+          });
+        } else { // Share API was not available
+          toast({ title: 'Copied!', description: 'Progress details copied to clipboard.' });
+        }
+      } catch (copyError) {
+        console.error('Error copying to clipboard:', copyError);
+        if (shareAttempted && shareError) { // Share API failed AND copy failed
+           toast({ title: 'Share & Copy Failed', description: 'Could not share using the native interface or copy progress to clipboard.', variant: 'destructive' });
+        } else { // Share API not available AND copy failed
+           toast({ title: 'Copy Failed', description: 'Could not copy progress to clipboard.', variant: 'destructive' });
+        }
       }
     }
     setIsSharing(false);
@@ -153,11 +175,10 @@ export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
     );
   }
 
-  // Update example data to use current habits length for "total"
   const weeklyProgress = chartDataExample.map(d => ({
     ...d,
-    completed: Math.min(d.completed, totalHabits > 0 ? totalHabits : 5), // Ensure completed isn't > total
-    total: totalHabits > 0 ? totalHabits : 5, // Use actual total habits or a default if none
+    completed: Math.min(d.completed, totalHabits > 0 ? totalHabits : 5), 
+    total: totalHabits > 0 ? totalHabits : 5, 
     remaining: Math.max(0, (totalHabits > 0 ? totalHabits : 5) - Math.min(d.completed, totalHabits > 0 ? totalHabits : 5))
   }));
 
