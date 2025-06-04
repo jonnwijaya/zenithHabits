@@ -68,10 +68,16 @@ export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
     if (typeof window !== 'undefined') {
       const style = window.getComputedStyle(document.documentElement);
       const backgroundVar = style.getPropertyValue('--background').trim();
+      // HSL variables are in the format "H S% L%" or "H S L"
+      // We need to convert this to hsl(H, S%, L%)
       if (backgroundVar) {
-        return `hsl(${backgroundVar})`;
+        const parts = backgroundVar.split(" ");
+        if (parts.length === 3) {
+          return `hsl(${parts[0]}, ${parts[1]}, ${parts[2]})`;
+        }
       }
     }
+    // Fallback if CSS variable parsing fails
     const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
     return isDarkMode ? 'hsl(280, 8%, 17%)' : 'hsl(280, 25%, 97%)';
   };
@@ -86,6 +92,7 @@ export function ProgressShareDialog({ habits }: ProgressShareDialogProps) {
       const dataUrl = await toPng(chartRef.current, { 
         pixelRatio: 2,
         backgroundColor: getChartBackgroundColor(),
+        skipFonts: true, // Add this option to prevent font fetching issues
       });
       const link = document.createElement('a');
       link.download = 'zenith-habits-progress.png';
