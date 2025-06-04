@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { Mountain, CalendarDays, LogIn, LogOut, UserCircle } from 'lucide-react';
+import { Mountain, CalendarDays, LogOut, UserCircle, LogIn } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,15 +15,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { AuthFormDialog } from '@/components/auth/auth-form-dialog';
 
 
 export function Header() {
-  const { user, loginWithGoogle, logout, isLoading } = useAuth();
+  const { user, logout, isLoading } = useAuth();
 
   const getInitials = (displayName?: string | null, email?: string | null) => {
     if (displayName) {
       const names = displayName.split(' ');
-      if (names.length > 1) {
+      if (names.length > 1 && names[0] && names[names.length -1]) {
         return (names[0][0] + names[names.length - 1][0]).toUpperCase();
       }
       return displayName.substring(0, 2).toUpperCase();
@@ -68,9 +69,9 @@ export function Header() {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">
-                      {user.displayName || 'User'}
+                      {user.displayName || user.email || 'User'}
                     </p>
-                    {user.email && (
+                    {user.email && user.displayName && ( // Show email only if displayName is also present
                        <p className="text-xs leading-none text-muted-foreground">
                         {user.email}
                       </p>
@@ -85,10 +86,12 @@ export function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button variant="outline" onClick={loginWithGoogle}>
-              <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
-              Sign in with Google
-            </Button>
+            <AuthFormDialog triggerButton={
+              <Button variant="outline">
+                <LogIn className="mr-2 h-4 w-4" />
+                Login / Sign Up
+              </Button>
+            } />
           )}
         </nav>
       </div>

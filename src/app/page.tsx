@@ -15,11 +15,12 @@ import { CalendarView } from '@/components/habit/calendar-view';
 import { MotivationalNudge } from '@/components/general/motivational-nudge';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { LogIn, Mountain } from 'lucide-react';
+import { Mountain } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { AuthFormDialog } from '@/components/auth/auth-form-dialog';
 
 export default function HomePage() {
-  const { user, loginWithGoogle, logout, isLoading: authIsLoading, idToken } = useAuth();
+  const { user, isLoading: authIsLoading, idToken } = useAuth();
   const { toast } = useToast();
   
   const habitsKey = user ? `zenith_habits_${user.uid}` : 'zenith_habits_guest';
@@ -38,10 +39,11 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (user && isClient && idToken) { // Ensure idToken is available
+    if (user && isClient && idToken) { 
       const fetchData = async () => {
         setIsSyncing(true);
         try {
+          // const currentToken = await user.getIdToken(true); // Ensure fresh token
           const response = await fetch('/.netlify/functions/get-user-data', {
             headers: {
               'Authorization': `Bearer ${idToken}`,
@@ -52,27 +54,45 @@ export default function HomePage() {
             throw new Error(errorData.message || `Failed to fetch data: ${response.statusText}`);
           }
           const data = await response.json();
-          if (data.habits) setHabits(data.habits);
-          if (data.completionStatus) setHabitCompletionStatus(data.completionStatus);
+          if (data.habits && Array.isArray(data.habits)) { // Add basic validation
+            setHabits(data.habits);
+          } else if (data.habits) { // If habits exist but not an array (e.g. from old data structure)
+            setHabits(DEFAULT_HABITS); // Or handle migration
+          }
+          
+          if (data.completionStatus && typeof data.completionStatus === 'object') {
+             setHabitCompletionStatus(data.completionStatus);
+          } else if (data.completionStatus) {
+             setHabitCompletionStatus({});
+          }
           // toast({ title: "Data Synced", description: "Your habits have been loaded from the cloud." });
         } catch (error: any) {
           console.error("Error fetching user data:", error);
-          toast({ variant: "destructive", title: "Sync Error", description: `Could not load data: ${error.message}` });
+          toast({ variant: "destructive", title: "Sync Error", description: `Could not load data: ${error.message}. Using local data.` });
+          // If fetch fails, useLocalStorage already provides the local data.
         } finally {
           setIsSyncing(false);
         }
       };
       fetchData();
     } else if (!user && isClient) {
-      // Guest user or logged out, useLocalStorage handles loading data for guest keys
+      // Guest user or logged out, useLocalStorage handles loading/resetting data for guest keys
+      // Ensure data is for guest or reset if switching from a user
+      if(habitsKey !== 'zenith_habits_guest') {
+        setHabits(DEFAULT_HABITS);
+        setHabitCompletionStatus({});
+      }
     }
-  }, [user, isClient, idToken, toast, setHabits, setHabitCompletionStatus, habitsKey, completionStatusKey]); // Added keys to dependencies
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isClient, idToken, toast, habitsKey, completionStatusKey]);
+  // Removed setHabits, setHabitCompletionStatus from deps as they come from useLocalStorage and should be stable
 
 
   const saveData = useCallback(async (currentHabits: Habit[], currentStatus: HabitCompletionStatus) => {
     if (user && isClient && idToken) {
       setIsSyncing(true);
       try {
+        // const currentToken = await user.getIdToken(true); // Ensure fresh token
         const response = await fetch('/.netlify/functions/save-user-data', {
           method: 'POST',
           headers: { 
@@ -96,8 +116,7 @@ export default function HomePage() {
   }, [user, isClient, idToken, toast]);
 
   useEffect(() => {
-    // Debounced save for logged-in users
-    if (user && isClient && idToken) {
+    if (user && isClient && idToken && (habits !== DEFAULT_HABITS || Object.keys(habitCompletionStatus).length > 0)) {
       const handler = setTimeout(() => {
         saveData(habits, habitCompletionStatus);
       }, 1500); 
@@ -123,7 +142,8 @@ export default function HomePage() {
         return h;
       })
     );
-  }, [isClient, setHabits]); // Removed habitsKey as dependency, setHabits should be stable from useLocalStorage
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient, setHabits]); 
 
   const handleSaveHabit = (habitData: { name: string; icon: string }, id?: string) => {
     if (id) {
@@ -209,7 +229,11 @@ export default function HomePage() {
     });
   };
 
-  if (authIsLoading || !isClient || (user && isSyncing && habits.length === 0 && !DEFAULT_HABITS.length)) { 
+  // Enhanced loading condition
+  const showLoadingState = authIsLoading || !isClient || (user && isSyncing && habits.length === 0 && Object.keys(habitCompletionStatus).length === 0 && !DEFAULT_HABITS.length);
+
+
+  if (showLoadingState) { 
     return (
       <div className="flex flex-col min-h-screen">
         <Header />
@@ -232,12 +256,13 @@ export default function HomePage() {
           <Mountain className="h-16 w-16 text-primary mb-6" />
           <h1 className="text-3xl font-bold mb-4">Welcome to Zenith Habits</h1>
           <p className="text-lg text-muted-foreground mb-8">
-            Please log in to track your habits and sync your progress across devices.
+            Please log in or sign up to track your habits and sync your progress.
           </p>
-          <Button size="lg" onClick={loginWithGoogle} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-             <svg className="mr-2 h-5 w-5" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
-            Sign in with Google
-          </Button>
+          <AuthFormDialog triggerButton={
+            <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              Login / Sign Up
+            </Button>
+          } />
         </main>
         <Footer habits={[]} />
       </div>
@@ -249,7 +274,7 @@ export default function HomePage() {
       <Header />
       <MotivationalNudge />
       <main className="flex-1 container mx-auto px-4 py-8 space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           <section className="lg:col-span-2 space-y-6">
             <HabitList
               habits={habits}
@@ -258,7 +283,7 @@ export default function HomePage() {
               onDeleteHabit={handleDeleteHabit}
             />
           </section>
-          <aside className="lg:col-span-1 space-y-6">
+          <aside className="lg:col-span-1 space-y-6 self-start">
             <AffirmationDisplay />
             <CalendarView habits={habits} completionStatus={habitCompletionStatus} />
           </aside>

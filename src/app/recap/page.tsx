@@ -12,11 +12,12 @@ import { MonthlyRecapView } from '@/components/recap/monthly-recap-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { LogIn, Mountain } from 'lucide-react';
+import { Mountain } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { AuthFormDialog } from '@/components/auth/auth-form-dialog';
 
 export default function RecapPage() {
-  const { user, loginWithGoogle, isLoading: authIsLoading, idToken } = useAuth();
+  const { user, isLoading: authIsLoading, idToken } = useAuth();
   const { toast } = useToast();
 
   const habitsKey = user ? `zenith_habits_${user.uid}` : 'zenith_habits_guest';
@@ -43,6 +44,7 @@ export default function RecapPage() {
       const fetchData = async () => {
         setIsSyncing(true);
         try {
+        //   const currentToken = await user.getIdToken(true); // Ensure fresh token
           const response = await fetch('/.netlify/functions/get-user-data', {
              headers: {
               'Authorization': `Bearer ${idToken}`,
@@ -53,21 +55,39 @@ export default function RecapPage() {
             throw new Error(errorData.message || `Failed to fetch data: ${response.statusText}`);
           }
           const data = await response.json();
-          if (data.habits) setHabits(data.habits);
-          if (data.completionStatus) setHabitCompletionStatus(data.completionStatus);
+          if (data.habits && Array.isArray(data.habits)) {
+            setHabits(data.habits);
+          } else if (data.habits) {
+            setHabits(DEFAULT_HABITS);
+          }
+
+          if (data.completionStatus && typeof data.completionStatus === 'object') {
+            setHabitCompletionStatus(data.completionStatus);
+          } else if (data.completionStatus) {
+            setHabitCompletionStatus({});
+          }
           // toast({ title: "Recap Synced", description: "Your recap data has been loaded." });
         } catch (error: any) {
           console.error("Error fetching user data for recap:", error);
-          toast({ variant: "destructive", title: "Sync Error", description: `Could not load recap data: ${error.message}` });
+          toast({ variant: "destructive", title: "Sync Error", description: `Could not load recap data: ${error.message}. Using local data.` });
         } finally {
           setIsSyncing(false);
         }
       };
       fetchData();
+    } else if (!user && isClient) {
+       if(habitsKey !== 'zenith_habits_guest') {
+        setHabits(DEFAULT_HABITS);
+        setHabitCompletionStatus({});
+      }
     }
-  }, [user, isClient, idToken, toast, setHabits, setHabitCompletionStatus, habitsKey, completionStatusKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isClient, idToken, toast, habitsKey, completionStatusKey]);
+  // Removed setHabits, setHabitCompletionStatus from deps
   
-  if (authIsLoading || !isClient || (user && isSyncing && habits.length === 0 && !DEFAULT_HABITS.length)) {
+  const showLoadingState = authIsLoading || !isClient || (user && isSyncing && habits.length === 0 && Object.keys(habitCompletionStatus).length === 0 && !DEFAULT_HABITS.length);
+
+  if (showLoadingState) {
     return (
       <div className="flex flex-col min-h-screen bg-background text-foreground">
         <Header />
@@ -103,12 +123,13 @@ export default function RecapPage() {
           <Mountain className="h-16 w-16 text-primary mb-6" />
           <h1 className="text-3xl font-bold mb-4">View Your Recap</h1>
           <p className="text-lg text-muted-foreground mb-8">
-            Please log in to see your monthly habit recap.
+            Please log in or sign up to see your monthly habit recap.
           </p>
-          <Button size="lg" onClick={loginWithGoogle} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            <svg className="mr-2 h-5 w-5" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
-            Sign in with Google
-          </Button>
+          <AuthFormDialog triggerButton={
+             <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              Login / Sign Up
+            </Button>
+          }/>
         </main>
         <Footer habits={[]} />
       </div>

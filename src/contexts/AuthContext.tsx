@@ -6,17 +6,19 @@ import {
   getAuth, 
   onAuthStateChanged, 
   signOut, 
-  GoogleAuthProvider, 
-  signInWithPopup 
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile
 } from 'firebase/auth';
 import type { ReactNode} from 'react';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { app } from '@/lib/firebase'; // Ensure firebase is initialized here or in lib/firebase.ts
+import { app } from '@/lib/firebase'; 
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: FirebaseUser | null;
-  loginWithGoogle: () => Promise<void>;
+  signUpWithEmailPassword: (email: string, password: string, displayName?: string) => Promise<void>;
+  signInWithEmailPassword: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
   idToken: string | null;
@@ -29,9 +31,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [idToken, setIdToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const auth = getAuth(app); // Get auth instance
+  const auth = getAuth(app); 
 
   useEffect(() => {
+    setIsLoading(true);
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -49,18 +52,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     });
 
-    // Refresh token periodically or on specific events if needed
-    // Firebase SDK handles most token refreshes automatically
-    // but you can listen to idTokenChanged for more granular control
     const idTokenListener = auth.onIdTokenChanged(async (userWithPotentiallyNewToken) => {
         if (userWithPotentiallyNewToken) {
-            const token = await userWithPotentiallyNewToken.getIdToken();
-            setIdToken(token);
+            try {
+                const token = await userWithPotentiallyNewToken.getIdToken(true); // Force refresh if needed
+                setIdToken(token);
+            } catch (error) {
+                console.error("Error refreshing ID token:", error);
+                setIdToken(null);
+            }
         } else {
             setIdToken(null);
         }
     });
-
 
     return () => {
       unsubscribe();
@@ -68,38 +72,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [auth, toast]);
 
-  const loginWithGoogle = async () => {
+  const signUpWithEmailPassword = async (email: string, password: string, displayName?: string) => {
     setIsLoading(true);
-    const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
-      // onAuthStateChanged will handle setting the user and token
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      if (displayName && userCredential.user) {
+        await updateProfile(userCredential.user, { displayName });
+        // Manually trigger a user update to reflect displayName immediately,
+        // as onAuthStateChanged might be slightly delayed.
+        setUser(auth.currentUser); 
+      }
+      toast({ title: "Sign Up Successful", description: "Welcome! Your account has been created." });
+    } catch (error: any) {
+      console.error("Error during email/password sign-up:", error);
+      toast({ variant: "destructive", title: "Sign Up Failed", description: error.message || "Could not create your account." });
+      throw error; // Re-throw to be caught by the form
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signInWithEmailPassword = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
       toast({ title: "Login Successful", description: "Welcome back!" });
     } catch (error: any) {
-      console.error("Error during Google sign-in:", error);
-      toast({ variant: "destructive", title: "Login Failed", description: error.message || "Could not sign in with Google." });
-      setIsLoading(false); // Ensure loading is false on error
+      console.error("Error during email/password sign-in:", error);
+      toast({ variant: "destructive", title: "Login Failed", description: error.message || "Could not sign in." });
+      throw error; // Re-throw to be caught by the form
+    } finally {
+      setIsLoading(false);
     }
-    // setIsLoading(false) is handled by onAuthStateChanged
   };
 
   const logout = async () => {
     setIsLoading(true);
     try {
       await signOut(auth);
-      // onAuthStateChanged will handle clearing user and token
       toast({ title: "Logged Out", description: "You have been successfully logged out." });
     } catch (error: any) {
       console.error("Error during sign-out:", error);
       toast({ variant: "destructive", title: "Logout Failed", description: error.message || "Could not log out." });
     } finally {
-      // Even if signOut errors, onAuthStateChanged should fire with null user
-      // setIsLoading(false) is handled by onAuthStateChanged
+      setIsLoading(false);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loginWithGoogle, logout, isLoading, idToken }}>
+    <AuthContext.Provider value={{ user, signUpWithEmailPassword, signInWithEmailPassword, logout, isLoading, idToken }}>
       {children}
     </AuthContext.Provider>
   );
