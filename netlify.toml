@@ -9,6 +9,9 @@
   # For Next.js, this is typically ".next"
   publish = ".next"
 
+  # Directory for Netlify Functions
+  functions = "netlify/functions"
+
 # The @netlify/plugin-nextjs build plugin is essential for deploying 
 # Next.js sites on Netlify with full feature support (SSR, ISR, Image Optimization, etc.).
 # Make sure it's also added to your package.json devDependencies.
