@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { Mountain } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { AmbientPlayerToggle } from '@/components/audio/ambient-player-toggle';
 
 export function Header() {
   return (
@@ -12,7 +11,6 @@ export function Header() {
           <span className="font-headline text-lg font-semibold">Zenith Habits</span>
         </Link>
         <nav className="flex items-center gap-2">
-          <AmbientPlayerToggle />
           <ThemeToggle />
         </nav>
       </div>
