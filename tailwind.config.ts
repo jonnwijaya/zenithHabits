@@ -1,3 +1,4 @@
+
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -10,8 +11,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['PT Sans', 'sans-serif'],
-        headline: ['PT Sans', 'sans-serif'],
+        body: ['var(--font-pt-sans)', 'sans-serif'], // Use CSS variable from next/font
+        headline: ['var(--font-pt-sans)', 'sans-serif'], // Use CSS variable from next/font
         code: ['monospace'],
       },
       colors: {
@@ -48,13 +49,7 @@ export default {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
-        chart: {
-          '1': 'hsl(var(--chart-1))',
-          '2': 'hsl(var(--chart-2))',
-          '3': 'hsl(var(--chart-3))',
-          '4': 'hsl(var(--chart-4))',
-          '5': 'hsl(var(--chart-5))',
-        },
+        /* chart variables were here, removed as they are in globals.css and tied to recharts */
       },
       borderRadius: {
         lg: 'var(--radius)',

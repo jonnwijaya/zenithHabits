@@ -24,12 +24,11 @@
     --border: 280 20% 90%; /* Light lavender gray border */
     --input: 280 20% 94%; /* Slightly darker input background */
     --ring: 285 38% 79%; /* Primary color for rings */
-    --chart-1: 285 38% 79%; /* Primary */
-    --chart-2: 354 55% 89%; /* Accent */
-    --chart-3: 280 25% 70%; 
-    --chart-4: 300 40% 75%;
-    --chart-5: 260 40% 75%;
+    /* Removed --chart-* variables as recharts/chart component is removed */
     --radius: 0.5rem;
+
+    /* Font variable for next/font */
+    --font-pt-sans: 'PT Sans', sans-serif;
   }
   .dark {
     --background: 280 8% 17%; /* #2E2A30 - Deep charcoal/purple */
@@ -51,11 +50,7 @@
     --border: 280 8% 25%;
     --input: 280 8% 22%;
     --ring: 285 38% 79%; /* Primary color for rings */
-    --chart-1: 285 38% 79%;
-    --chart-2: 354 30% 75%;
-    --chart-3: 280 25% 60%;
-    --chart-4: 300 40% 65%;
-    --chart-5: 260 40% 65%;
+    /* Removed --chart-* variables as recharts/chart component is removed */
   }
 }
 
@@ -64,7 +59,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-body; /* font-body will use --font-pt-sans */
     transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
